@@ -1,0 +1,9 @@
+Package: hregression
+Title: Hierarchical Regression 
+Version: 0.1
+Description: Functions for analysis with hierarchical regression models 
+Author: Peter Hoff
+Maintainer: Peter Hoff <pdhoff@uw.edu>
+License: GPL-3 
+Suggests: knitr
+VignetteBuilder: knitr

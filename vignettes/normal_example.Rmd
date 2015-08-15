@@ -1,0 +1,113 @@
+---
+title: "Bayesian Hierarchical Regression"
+author: "Peter Hoff"
+date: "`r Sys.Date()`"
+output: html_document
+vignette: >
+  %\VignetteIndexEntry{Bayesian Hierarchical Regression}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+This package provides functions to approximate the posterior
+distribution of the parameters in the hierarchical 
+regression  model given by
+\[
+\begin{align*}
+y_i & =  X_i b_i + \sigma e^y_i,   \\
+\text{vec}(b_i) & = \text{vec}(b_0)  + V_0^{1/2} e^b_i
+\end{align*}
+\]
+where
+
+- $y_i\in \mathbb R^{n\times 1}$;
+- $X_i\in \mathbb R^{n\times p}$;
+- $b_i\in \mathbb R^{p\times 1}$.
+
+for $i=1,\ldots,r$.
+The error terms $e^y_i$ and $e^b_i$
+consist of independent standard normal entries, and
+are also independent
+across values of $i$.
+
+
+
+### load package
+```{r}
+library(hregression)
+```
+
+
+### generate some parameters and data
+```{r} 
+set.seed(1) 
+
+p<-5 ; n<-50 ; r<-100
+
+X<-rsan(c(r,p,n)) 
+
+b0.0<-rnorm(p)  
+V0.0<-rwish(diag(p)) 
+ve.0<-2.3
+
+B.0<-Y<-NULL 
+for(i in 1:r)
+{
+  b<-b0.0 + t(chol(V0.0))%*%rnorm(p) 
+  y<-t(b)%*%X[i,,] + rnorm(n)*sqrt(ve.0) 
+  Y<-rbind(Y,y) 
+  B.0<-rbind(B.0,t(b)) 
+}
+```
+
+
+### starting values 
+```{r} 
+B<-NULL 
+for(i in 1:r)
+{
+  B<-rbind(B, lm(Y[i,]~ -1+t(X[i,,]))$coef ) 
+}
+
+b0<-apply(B,2,mean) 
+```
+
+### MCMC 
+```{r,,fig.keep='last'} 
+BPS<-B*0 
+b0PS<-vePS<-V0PS<-NULL
+
+
+for(s in 1:1000)
+{
+  
+  ve<-rve_fc(Y,X,B)  
+
+  V0<-rV0_fc(B,b0) 
+
+  b0<-rb0_fc(B,V0) 
+
+  B<-rB_fc(Y,X,b0,V0,ve)
+
+
+  # output  
+  if(s%%10==0) 
+  {
+    BPS<-BPS+B*10
+    vePS<-c(vePS,ve) 
+    b0PS<-rbind(b0PS,c(b0))
+    V0PS<-rbind(V0PS,V0[upper.tri(V0,diag=TRUE)]  ) 
+
+    par(mfrow=c(3,2),mar=c(3,3,1,1),mgp=c(1.75,.75,0))
+    plot(B.0,B) ; abline(0,1) 
+    plot(B.0,BPS/s) ; abline(0,1) 
+    plot(vePS,type="l") ; abline(h=ve.0) 
+    matplot(b0PS,type="l",lty=2,col=1:length(b0)) 
+    abline(h=b0.0,col=1:length(b0)) 
+    abline(h=apply(b0PS,2,mean),lty=2,col=1:length(b0))
+    plot(V0.0[upper.tri(V0,diag=TRUE)], apply(V0PS,2,mean)) ; abline(0,1) 
+    matplot(V0PS,type="l",lty=2)
+  }
+
+}
+```
